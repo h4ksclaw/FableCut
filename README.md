@@ -2,6 +2,8 @@
 
 **A browser video editor that AI agents can drive.**
 
+https://github.com/user-attachments/assets/2430b854-168b-4a9a-af2e-489e5efa7543
+
 FableCut is a Premiere-style non-linear video editor that runs entirely in your
 browser — and exposes its whole timeline as one JSON document. Edit it by hand,
 from the UI, or let an AI agent (Claude Code, Claude Desktop, or anything that
