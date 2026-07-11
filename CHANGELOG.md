@@ -5,6 +5,22 @@ All notable changes to FableCut are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-11
+
+### Added
+- **Title styles** — text clips no longer all look the same. Adding a title now
+  rotates through curated one-tap looks (Impact, Elegant, Kinetic cut, Neon,
+  Handwritten, Serif drop, Subtitle, Bold rise), each bundling a **different
+  font**, placement and animation. Pick or shuffle them from the inspector, or
+  reproduce any look from an agent by writing the same props.
+- **Four cinematic caption animations**: `clip-reveal` (wipe-mask sweep),
+  `zoom-in` (scale + opacity settle), `font-cut` (rhythmically swaps the typeface
+  from a `fontCutSet`, then settles), and `rise-mask` (lower-third reveal). All
+  render on the existing frame-accurate path, so they export unchanged.
+- Expanded the built-in Google-font list with the display faces the styles use
+  (Archivo Black, Abril Fatface, Barlow, Teko, Roboto). Any font name still
+  auto-downloads on demand.
+
 ## [1.3.1] - 2026-07-11
 
 ### Security
@@ -135,6 +151,7 @@ the report in [#1](https://github.com/ronak-create/FableCut/issues/1) — thanks
 - Three control surfaces for AI agents: **MCP server**, direct `project.json`
   editing, and a **REST API** with live-reload over server-sent events.
 
+[1.4.0]: https://github.com/ronak-create/FableCut/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/ronak-create/FableCut/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/ronak-create/FableCut/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ronak-create/FableCut/compare/v1.1.0...v1.2.0

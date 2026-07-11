@@ -52,7 +52,8 @@ const TRANSITIONS = ["none", "fade", "slide-left", "slide-right", "slide-up", "s
   "zoom", "wipe", "wipe-right", "wipe-up", "wipe-down", "iris", "spin", "blur", "whip",
   "glitch", "pop"];
 const TEXT_ANIMS = ["none", "typewriter", "word-pop", "word-slide", "karaoke",
-  "letter-pop", "wave", "bounce", "shake"];
+  "letter-pop", "wave", "bounce", "shake",
+  "clip-reveal", "zoom-in", "font-cut", "rise-mask"];
 const BLEND_MODES = ["normal", "multiply", "screen", "overlay", "lighter", "soft-light",
   "hard-light", "color-dodge", "darken", "lighten", "difference"];
 /* Named looks. % props multiply against the clip's own value, additive props add. */
@@ -73,8 +74,31 @@ const FILTER_PRESETS = {
 };
 const SYSTEM_FONTS = ["Segoe UI", "Arial", "Georgia", "Impact", "Courier New",
   "Trebuchet MS", "Verdana", "Times New Roman", "Comic Sans MS", "Consolas"];
-const GOOGLE_FONTS = ["Anton", "Bebas Neue", "Caveat", "Inter", "Lobster", "Montserrat",
-  "Oswald", "Pacifico", "Permanent Marker", "Playfair Display", "Poppins", "Roboto Condensed"];
+const GOOGLE_FONTS = ["Anton", "Archivo Black", "Abril Fatface", "Barlow", "Bebas Neue",
+  "Caveat", "Inter", "Lobster", "Montserrat", "Oswald", "Pacifico", "Permanent Marker",
+  "Playfair Display", "Poppins", "Roboto", "Roboto Condensed", "Teko"];
+
+/* ── Title styles: cohesive one-tap looks. Each bundles a DIFFERENT font,
+   placement and animation, so titles vary instead of all looking basic.
+   Agents can reproduce a look by writing the same props directly. ── */
+const FONT_CUT_DEFAULT = ["Anton", "Bebas Neue", "Archivo Black", "Oswald", "Impact"];
+const STYLE_RESET = {   // decorative props a style owns; reset before applying
+  color2: "", glow: 0, glowColor: "", strokeWidth: 0, bgColor: "#000000", bgOpacity: 0,
+  rotation: 0, letterSpacing: 0, uppercase: false, italic: false, textShadow: 12,
+  fontCutSet: undefined, align: "center",
+};
+const TITLE_STYLES = {
+  plain:      { label: "Plain",       place: "center",     props: { font: "Segoe UI", fontSize: 72, bold: true, color: "#ffffff", textAnim: "none" } },
+  impact:     { label: "Impact",      place: "lower",      props: { font: "Anton", fontSize: 96, bold: false, uppercase: true, color: "#ffffff", textShadow: 22, textAnim: "word-pop" } },
+  elegant:    { label: "Elegant",     place: "center",     props: { font: "Playfair Display", fontSize: 88, bold: false, color: "#ffffff", color2: "#ffd166", letterSpacing: 2, textAnim: "clip-reveal" } },
+  kinetic:    { label: "Kinetic cut", place: "center",     props: { font: "Bebas Neue", fontSize: 120, bold: false, uppercase: true, color: "#ffd166", letterSpacing: 3, textAnim: "font-cut", fontCutSet: ["Anton", "Bebas Neue", "Archivo Black", "Oswald"] } },
+  neon:       { label: "Neon",        place: "center",     props: { font: "Bebas Neue", fontSize: 104, bold: false, uppercase: true, color: "#ffffff", glow: 60, glowColor: "#22d3ee", textAnim: "wave" } },
+  handwritten:{ label: "Handwritten", place: "lower-left", props: { font: "Caveat", fontSize: 92, bold: false, color: "#ffffff", rotation: -4, textAnim: "word-slide" } },
+  serifDrop:  { label: "Serif drop",  place: "center",     props: { font: "Abril Fatface", fontSize: 96, bold: false, color: "#ffffff", textShadow: 18, textAnim: "zoom-in" } },
+  subtitle:   { label: "Subtitle",    place: "lower",      props: { font: "Roboto", fontSize: 52, bold: false, color: "#ffffff", bgColor: "#000000", bgOpacity: 0.5, textAnim: "karaoke" } },
+  boldRise:   { label: "Bold rise",   place: "lower",      props: { font: "Archivo Black", fontSize: 92, bold: false, uppercase: true, color: "#ffffff", textAnim: "rise-mask" } },
+};
+const STYLE_CYCLE = ["impact", "elegant", "kinetic", "neon", "handwritten", "serifDrop", "boldRise"];
 const AUDIO_EXT = /\.(mp3|wav|ogg|m4a|aac|flac|mpeg)$/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|mkv|m4v)$/i;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif)$/i;
@@ -628,6 +652,23 @@ function addClipFromMedia(m, trackId, at) {
   selectClip(c.id); scheduleSave();
   return c;
 }
+/* Apply a named title style: reset the props a style owns, merge the style,
+   place it (canvas-aware), and make sure its fonts are loaded. */
+function applyTitleStyle(clip, name) {
+  const st = TITLE_STYLES[name] || TITLE_STYLES.plain;
+  const P = clip.props;
+  Object.assign(P, STYLE_RESET, st.props);
+  const H = project.height || 720, W = project.width || 1280;
+  const place = st.place || "center";
+  P.x = 0;
+  P.y = place === "lower" ? Math.round(H * 0.30)
+      : place === "upper" ? -Math.round(H * 0.30)
+      : place === "lower-left" ? Math.round(H * 0.28) : 0;
+  if (place === "lower-left") { P.x = -Math.round(W * 0.18); P.align = "left"; }
+  ensureFont(P.font);
+  if (Array.isArray(P.fontCutSet)) P.fontCutSet.forEach(ensureFont);
+  clip.styleName = name;
+}
 function addTitle() {
   pushUndo();
   const c = {
@@ -635,6 +676,9 @@ function addTitle() {
     start: state.time, in: 0, duration: 4, name: "Title",
     props: { ...DEFAULT_PROPS },
   };
+  // interesting by default: rotate through the styles so titles vary
+  runtime.titleStyleIdx = ((runtime.titleStyleIdx || 0) + 1) % STYLE_CYCLE.length;
+  applyTitleStyle(c, STYLE_CYCLE[runtime.titleStyleIdx]);
   project.clips.push(c);
   selectClip(c.id); scheduleSave();
 }
@@ -1274,8 +1318,10 @@ function renderInspector(lite) {
       ${row("Glow color", `<input type="color" data-k="glowColor" value="${p.glowColor || p.color}">
         <button class="btn tiny${p.glowColor ? "" : " toggle on"}" data-action="glow-auto" title="Glow uses the text color">auto</button>`)}
     </div>
-    <div class="insp-section"><h3>Caption animation</h3>
-      ${row("Style", `<select data-k="textAnim">${TEXT_ANIMS.map((a) => `<option ${a === p.textAnim ? "selected" : ""}>${a}</option>`).join("")}</select>`)}
+    <div class="insp-section"><h3>Title &amp; caption</h3>
+      ${row("Title style", `<select data-sel="title-style">${Object.entries(TITLE_STYLES).map(([k, v]) => `<option value="${k}" ${c.styleName === k ? "selected" : ""}>${v.label}</option>`).join("")}</select>
+        <button class="btn tiny" data-action="title-shuffle" title="Random style">Shuffle</button>`)}
+      ${row("Animation", `<select data-k="textAnim">${TEXT_ANIMS.map((a) => `<option ${a === p.textAnim ? "selected" : ""}>${a}</option>`).join("")}</select>`)}
       ${slider("wordRate", 0.05, 0.6, 0.01, p.wordRate, "s")}
     </div>`;
   }
@@ -1322,6 +1368,18 @@ function renderInspector(lite) {
         c.props.font = name;
         toast(`Loading Google font "${name}"…`);
       }
+      else if (a === "title-shuffle") {
+        const keys = Object.keys(TITLE_STYLES).filter((k) => k !== "plain" && k !== c.styleName);
+        applyTitleStyle(c, keys[Math.floor(Math.random() * keys.length)]);
+      }
+      scheduleSave(); renderInspector();
+    });
+  });
+  els.inspector.querySelectorAll("[data-sel='title-style']").forEach((sel2) => {
+    sel2.addEventListener("change", () => {
+      pushUndo();
+      applyTitleStyle(c, sel2.value);
+      state.dirtyTimeline = true;
       scheduleSave(); renderInspector();
     });
   });
@@ -2016,6 +2074,72 @@ function drawText(c, p, local) {
   if (anim === "none") {
     ctx2d.textAlign = "center";
     rawLines.forEach((ln, i) => paint(ln, lineCx(i), y0 + i * lh));
+    return;
+  }
+  // clip-reveal: a wipe mask sweeps each line into view, left to right
+  if (anim === "clip-reveal") {
+    ctx2d.textAlign = "center";
+    rawLines.forEach((ln, i) => {
+      if (!ln.trim()) return;
+      const u = clamp((local - i * rate) / 0.5, 0, 1);
+      if (u <= 0) return;
+      const e = EASE["ease-out"](u), w = lineWidths[i], cx = lineCx(i), y = y0 + i * lh;
+      ctx2d.save();
+      ctx2d.beginPath();
+      ctx2d.rect(cx - w / 2 - 6, y - lh / 2, (w + 12) * e, lh);
+      ctx2d.clip();
+      paint(ln, cx, y);
+      ctx2d.restore();
+    });
+    return;
+  }
+  // zoom-in: text scales down into place with an opacity settle
+  if (anim === "zoom-in") {
+    ctx2d.textAlign = "center";
+    rawLines.forEach((ln, i) => {
+      if (!ln.trim()) return;
+      const u = clamp((local - i * rate) / 0.45, 0, 1);
+      if (u <= 0) return;
+      const e = EASE["ease-out"](u), s = 1.35 - 0.35 * e;
+      ctx2d.save();
+      ctx2d.translate(lineCx(i), y0 + i * lh);
+      ctx2d.scale(s, s);
+      paint(ln, 0, 0, Math.min(1, u * 1.6));
+      ctx2d.restore();
+    });
+    return;
+  }
+  // rise-mask: each line rises from behind its own baseline (lower-third reveal)
+  if (anim === "rise-mask") {
+    ctx2d.textAlign = "center";
+    rawLines.forEach((ln, i) => {
+      if (!ln.trim()) return;
+      const u = clamp((local - i * rate) / 0.5, 0, 1);
+      if (u <= 0) return;
+      const e = EASE["ease-out"](u), cx = lineCx(i), y = y0 + i * lh;
+      ctx2d.save();
+      ctx2d.beginPath();
+      ctx2d.rect(cx - blockW / 2 - 24, y - lh / 2, blockW + 48, lh);
+      ctx2d.clip();
+      paint(ln, cx, y + (1 - e) * lh);
+      ctx2d.restore();
+    });
+    return;
+  }
+  // font-cut: rhythmically swap the typeface, then settle (speed cuts)
+  if (anim === "font-cut") {
+    ctx2d.textAlign = "center";
+    const setF = (Array.isArray(p.fontCutSet) && p.fontCutSet.length) ? p.fontCutSet : FONT_CUT_DEFAULT;
+    setF.forEach(ensureFont);
+    const cutDur = 0.6, interval = 0.06;
+    let fam = p.font || "Segoe UI";
+    if (local < cutDur) fam = setF[Math.floor(local / interval) % setF.length];
+    ctx2d.font = `${p.italic ? "italic " : ""}${weight} ${size}px "${fam}", sans-serif`;
+    const lw = rawLines.map((ln) => ctx2d.measureText(ln).width);
+    const bw = Math.max(1, ...lw);
+    const lcx = (i) => align === "left" ? -bw / 2 + lw[i] / 2
+                     : align === "right" ? bw / 2 - lw[i] / 2 : 0;
+    rawLines.forEach((ln, i) => { if (ln.trim()) paint(ln, lcx(i), y0 + i * lh); });
     return;
   }
   if (anim === "typewriter") {

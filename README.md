@@ -55,8 +55,12 @@ same time.
   whip-pan, **glitch**, **pop**
 
 **Text**
+- **Title styles** — one-tap cohesive looks (Impact, Elegant, Kinetic cut, Neon,
+  Handwritten, and more); new titles vary the font, placement and animation
+  automatically instead of defaulting to one flat style
 - Kinetic captions: typewriter, word-pop, word-slide, karaoke, **letter-pop**,
-  **wave**, **bounce**, **shake**
+  **wave**, **bounce**, **shake**, **clip-reveal**, **zoom-in**, **font-cut**
+  (rhythmic typeface cuts), **rise-mask**
 - **Neon glow** for that TikTok caption look
 - Font editor: system fonts, drop-in custom fonts (`library/fonts/`), and **any
   Google Font by name** — loaded automatically

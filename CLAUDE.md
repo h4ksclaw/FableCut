@@ -260,8 +260,31 @@ Examples in `library/svg/`: `sparkles.svg` (loop), `lower-third.svg`,
 | `glowColor` | "" | glow color ("" = use the text color) |
 | `strokeWidth` `strokeColor` | 0, "#000" | text outline |
 | `bgColor` `bgOpacity` | "#000", 0 | rounded pill behind each line |
-| `textAnim` | "none" | typewriter · word-pop · word-slide · karaoke · **letter-pop** (per-character entrance) · **wave** (looping per-character ride) · **bounce** (looping per-word hop) · **shake** (looping jitter) |
-| `wordRate` | 0.15 | seconds per word (typewriter: /4, letter-pop: /3 per character) |
+| `textAnim` | "none" | typewriter · word-pop · word-slide · karaoke · **letter-pop** (per-character entrance) · **wave** (looping per-character ride) · **bounce** (looping per-word hop) · **shake** (looping jitter) · **clip-reveal** (wipe-mask sweep, per line) · **zoom-in** (scale + opacity settle) · **font-cut** (rhythmically swaps typeface, then settles — see `fontCutSet`) · **rise-mask** (line rises from behind its baseline, lower-third reveal) |
+| `wordRate` | 0.15 | seconds per word (typewriter: /4, letter-pop: /3 per character); also staggers `clip-reveal`/`zoom-in`/`rise-mask` per line |
+| `fontCutSet` | (curated) | array of font family names cycled by `font-cut`, e.g. `["Anton","Bebas Neue","Archivo Black","Oswald"]`; each is auto-loaded |
+
+**Title styles (one-tap cohesive looks).** Text clips created in the UI now
+rotate through curated styles so titles vary instead of all looking basic (the
+old flat `Segoe UI` / no-animation default). Each style bundles a **different
+font**, placement and animation. Apply one in the inspector (Title style
+dropdown + Shuffle), or reproduce it from an agent by writing the same props:
+
+| Style | Font | Look |
+| --- | --- | --- |
+| `impact` | Anton | uppercase, lower third, `word-pop`, big shadow |
+| `elegant` | Playfair Display | white→gold gradient, centered, `clip-reveal` |
+| `kinetic` | Bebas Neue | gold, `font-cut` cycling Anton/Bebas/Archivo/Oswald |
+| `neon` | Bebas Neue | cyan `glow`, `wave` |
+| `handwritten` | Caveat | rotated −4°, lower-left, `word-slide` |
+| `serifDrop` | Abril Fatface | centered, `zoom-in` |
+| `subtitle` | Roboto | small, bottom, bg pill, `karaoke` |
+| `boldRise` | Archivo Black | uppercase, lower third, `rise-mask` |
+
+**Rule for agents: vary the font per title — never reuse one font across a whole
+edit.** Any Google Font name auto-loads; the display faces above ship in
+`library/fonts/`. Placement props (`x`/`y`) are canvas-aware in the styles
+(lower third ≈ `y: height*0.30`).
 
 **Adjustment layers** (`kind:"adjust"`, `mediaId:null`): a clip that re-renders
 everything drawn *below* it (lower tracks + earlier clips) through its own
@@ -427,6 +450,18 @@ dims words until "spoken"; `typewriter` for terminal vibes.
 **Branded title**: `props: {font:"Bebas Neue", weight:700, letterSpacing:6,
 uppercase:true, color:"#ffffff", color2:"#7b6cff", textShadow:20}` — any Google
 Font name just works.
+
+**Kinetic font-cut title** (rhythmic typeface cuts on the beat, then settle):
+`props: {font:"Bebas Neue", fontSize:120, uppercase:true, color:"#ffd166",
+textAnim:"font-cut", fontCutSet:["Anton","Bebas Neue","Archivo Black","Oswald"]}`.
+
+**Elegant clip-on title** (letters wipe in): `props: {font:"Playfair Display",
+fontSize:88, color:"#ffffff", color2:"#ffd166", letterSpacing:2,
+textAnim:"clip-reveal"}` — centered, one clean sweep.
+
+**Lower-third reveal**: `props: {font:"Archivo Black", fontSize:92,
+uppercase:true, textAnim:"rise-mask", y:<height*0.30>}` — the line rises from
+behind its baseline. Pair with a `serifDrop`/`zoom-in` kicker above it.
 
 **Custom font**: drop `MyBrand.ttf` into `library/fonts/`, then
 `props.font: "MyBrand"`.
