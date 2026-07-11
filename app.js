@@ -1905,7 +1905,131 @@ function drawFrame(t = state.time) {
       .sort((a, b) => a.start - b.start);
     for (const c of clips) drawClip(c, W, H, t);
   }
+  // on-canvas selection handles (never during export or playback)
+  if (!state.exporting && !state.playing) drawSelectionOverlay(W, H, t);
 }
+
+/* ═══════════ Direct manipulation on the program monitor ═══════════
+   Drag a clip to move it, corner handles to resize (scale), the top
+   handle to rotate. Maps gestures straight onto props.x/y/scale/rotation. */
+function clipBounds(c, p, W, H) {
+  const cx = W / 2 + (+p.x || 0), cy = H / 2 + (+p.y || 0);
+  const rot = (p.rotation || 0) * Math.PI / 180, sc = +p.scale || 1;
+  let hw, hh;
+  if (c.kind === "text") {
+    ctx2d.save();
+    const size = p.fontSize || 72, weight = +p.weight || (p.bold ? 700 : 400);
+    ctx2d.font = `${p.italic ? "italic " : ""}${weight} ${size}px "${p.font || "Segoe UI"}", sans-serif`;
+    try { ctx2d.letterSpacing = `${+p.letterSpacing || 0}px`; } catch {}
+    let lines = String(p.text || "").split("\n");
+    if (p.uppercase) lines = lines.map((l) => l.toUpperCase());
+    const tw = Math.max(1, ...lines.map((l) => ctx2d.measureText(l).width));
+    const lh = size * clamp(+p.lineHeight || 1.2, 0.6, 3);
+    ctx2d.restore();
+    hw = (tw / 2 + size * 0.25) * sc;
+    hh = (lines.length * lh / 2 + size * 0.14) * sc;
+  } else {                       // media/svg: canvas-sized base box, scaled
+    hw = (W / 2) * sc; hh = (H / 2) * sc;
+  }
+  return { cx, cy, hw, hh, rot };
+}
+function isVisualClip(c) { return c && c.kind !== "adjust" && c.kind !== "audio"; }
+function drawSelectionOverlay(W, H, t) {
+  const c = getClip(state.selId);
+  if (!isVisualClip(c) || !activeAt(c, t)) return;
+  const b = clipBounds(c, evalProps(c, t), W, H);
+  const lw = Math.max(2, W / 640), hs = Math.max(6, W / 150), gap = Math.max(24, W / 34);
+  ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+  ctx2d.save();
+  ctx2d.translate(b.cx, b.cy); ctx2d.rotate(b.rot);
+  ctx2d.lineWidth = lw; ctx2d.strokeStyle = "#4f8cff";
+  ctx2d.setLineDash([lw * 4, lw * 3]);
+  ctx2d.strokeRect(-b.hw, -b.hh, b.hw * 2, b.hh * 2);
+  ctx2d.setLineDash([]);
+  ctx2d.beginPath(); ctx2d.moveTo(0, -b.hh); ctx2d.lineTo(0, -b.hh - gap); ctx2d.stroke();
+  ctx2d.fillStyle = "#ffffff";
+  for (const [x, y] of [[-b.hw, -b.hh], [b.hw, -b.hh], [b.hw, b.hh], [-b.hw, b.hh]]) {
+    ctx2d.beginPath(); ctx2d.rect(x - hs, y - hs, hs * 2, hs * 2); ctx2d.fill(); ctx2d.stroke();
+  }
+  ctx2d.beginPath(); ctx2d.arc(0, -b.hh - gap, hs * 1.1, 0, Math.PI * 2);
+  ctx2d.fillStyle = "#ffce5c"; ctx2d.fill(); ctx2d.stroke();
+  ctx2d.restore();
+}
+function canvasPt(e) {
+  const r = els.preview.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (els.preview.width / r.width),
+           y: (e.clientY - r.top) * (els.preview.height / r.height) };
+}
+function toLocal(pt, b) {
+  const dx = pt.x - b.cx, dy = pt.y - b.cy, cs = Math.cos(-b.rot), sn = Math.sin(-b.rot);
+  return { x: dx * cs - dy * sn, y: dx * sn + dy * cs };
+}
+function pickClipAt(pt, W, H) {
+  const seq = [];
+  for (const tr of TRACKS.filter((tk) => tk.kind === "video").slice().reverse()) {
+    for (const c of project.clips.filter((c) => c.track === tr.id && activeAt(c, state.time)).sort((a, b) => a.start - b.start))
+      if (isVisualClip(c)) seq.push(c);
+  }
+  for (let i = seq.length - 1; i >= 0; i--) {
+    const c = seq[i], b = clipBounds(c, evalProps(c, state.time), W, H), lp = toLocal(pt, b);
+    if (Math.abs(lp.x) <= b.hw && Math.abs(lp.y) <= b.hh) return c;
+  }
+  return null;
+}
+let canvasDrag = null, canvasDidMove = false;
+els.preview.style.touchAction = "none";
+els.preview.addEventListener("pointerdown", (e) => {
+  const W = els.preview.width, H = els.preview.height, pt = canvasPt(e);
+  const cur = getClip(state.selId);
+  canvasDrag = null;
+  if (isVisualClip(cur) && activeAt(cur, state.time)) {
+    const b = clipBounds(cur, evalProps(cur, state.time), W, H), lp = toLocal(pt, b);
+    const hs = Math.max(6, W / 150) * 1.8, gap = Math.max(24, W / 34);
+    if (Math.hypot(lp.x, lp.y + b.hh + gap) <= hs) {
+      canvasDrag = { mode: "rotate", id: cur.id, startRot: +cur.props.rotation || 0, startAng: Math.atan2(pt.y - b.cy, pt.x - b.cx) };
+    } else if ([[-b.hw, -b.hh], [b.hw, -b.hh], [b.hw, b.hh], [-b.hw, b.hh]].some(([cx, cy]) => Math.abs(lp.x - cx) <= hs && Math.abs(lp.y - cy) <= hs)) {
+      canvasDrag = { mode: "scale", id: cur.id, startScale: +cur.props.scale || 1, startDist: Math.hypot(lp.x, lp.y) || 1 };
+    } else if (Math.abs(lp.x) <= b.hw && Math.abs(lp.y) <= b.hh) {
+      canvasDrag = { mode: "move", id: cur.id, startX: +cur.props.x || 0, startY: +cur.props.y || 0, startPt: pt };
+    }
+  }
+  if (!canvasDrag) {
+    const hit = pickClipAt(pt, W, H);
+    if (!hit) return;
+    if (hit.id !== state.selId) { selectClip(hit.id); renderInspector(); }
+    canvasDrag = { mode: "move", id: hit.id, startX: +hit.props.x || 0, startY: +hit.props.y || 0, startPt: pt };
+  }
+  canvasDidMove = false;
+  els.preview.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+els.preview.addEventListener("pointermove", (e) => {
+  if (!canvasDrag) return;
+  const c = getClip(canvasDrag.id); if (!c) return;
+  const W = els.preview.width, H = els.preview.height, pt = canvasPt(e);
+  if (!canvasDidMove) { pushUndo(); canvasDidMove = true; } // one undo per drag, only if it actually moves
+  if (canvasDrag.mode === "move") {
+    c.props.x = Math.round(canvasDrag.startX + (pt.x - canvasDrag.startPt.x));
+    c.props.y = Math.round(canvasDrag.startY + (pt.y - canvasDrag.startPt.y));
+  } else if (canvasDrag.mode === "scale") {
+    const b = clipBounds(c, evalProps(c, state.time), W, H), lp = toLocal(pt, b);
+    c.props.scale = clamp(+(canvasDrag.startScale * (Math.hypot(lp.x, lp.y) / canvasDrag.startDist)).toFixed(3), 0.05, 12);
+  } else {
+    const cx = W / 2 + (+c.props.x || 0), cy = H / 2 + (+c.props.y || 0);
+    let deg = canvasDrag.startRot + (Math.atan2(pt.y - cy, pt.x - cx) - canvasDrag.startAng) * 180 / Math.PI;
+    if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+    c.props.rotation = Math.round(deg);
+  }
+});
+function endCanvasDrag(e) {
+  if (!canvasDrag) return;
+  canvasDrag = null;
+  try { els.preview.releasePointerCapture(e.pointerId); } catch {}
+  if (canvasDidMove) { scheduleSave(); renderInspector(); } // no-op on a pure click
+}
+els.preview.addEventListener("pointerup", endCanvasDrag);
+els.preview.addEventListener("pointercancel", endCanvasDrag);
+
 function drawClip(c, W, H, t) {
   if (c.kind === "adjust") { drawAdjust(c, W, H, t); return; }
   const p = evalProps(c, t);

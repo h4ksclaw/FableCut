@@ -5,6 +5,15 @@ All notable changes to FableCut are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-11
+
+### Added
+- **Direct manipulation on the program monitor** — click a clip or title on the
+  preview to select it, then drag the body to move, the corner handles to resize,
+  and the top handle to rotate (hold Shift to snap rotation to 15°). Gestures map
+  straight onto the clip's `x`/`y`/`scale`/`rotation` props. Selection handles are
+  drawn only on screen and never appear in an export.
+
 ## [1.4.0] - 2026-07-11
 
 ### Added
@@ -151,6 +160,7 @@ the report in [#1](https://github.com/ronak-create/FableCut/issues/1) — thanks
 - Three control surfaces for AI agents: **MCP server**, direct `project.json`
   editing, and a **REST API** with live-reload over server-sent events.
 
+[1.5.0]: https://github.com/ronak-create/FableCut/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ronak-create/FableCut/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/ronak-create/FableCut/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/ronak-create/FableCut/compare/v1.2.0...v1.3.0
