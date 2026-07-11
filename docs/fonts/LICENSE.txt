@@ -1,0 +1,8 @@
+Fonts in this directory are redistributed under the SIL Open Font License 1.1.
+
+Archivo Black - Copyright the Archivo Project Authors
+  https://fonts.google.com/specimen/Archivo+Black
+  License: SIL Open Font License, Version 1.1 (https://openfontlicense.org)
+
+The OFL permits bundling and redistribution of the font with any project,
+including for commercial use, provided this notice is retained.
