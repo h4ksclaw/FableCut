@@ -64,7 +64,7 @@ body {
   color: var(--dim); text-transform: uppercase; border-bottom: 1px solid var(--border);
 }
 .panel-head-actions { display: flex; gap: 6px; text-transform: none; }
-.upper { display: grid; grid-template-columns: 250px minmax(0,1fr) 280px; gap: 6px; min-height: 0; }
+.upper { display: grid; grid-template-columns: 280px minmax(0,1fr) 280px; gap: 6px; min-height: 0; }
 
 /* ── Media bin ── */
 .bin-tabs { display: flex; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid var(--border); }
