@@ -19,6 +19,9 @@ const TRACKS = [
 const RULER_H = 26;
 const SNAP_PX = 8;
 const MIN_DUR = 0.05;
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 300;
+const TIMELINE_PAD_SEC = 15; // trailing empty seconds in the scrollable content
 
 const DEFAULT_PROPS = {
   x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, volume: 1,
@@ -761,7 +764,7 @@ els.timelineScroll.addEventListener("scroll", () => {
 });
 function contentWidth() {
   const minSec = (els.timelineScroll.clientWidth || 800) / state.pps;
-  return Math.max(projDur() + 15, minSec) * state.pps;
+  return Math.max(projDur() + TIMELINE_PAD_SEC, minSec) * state.pps;
 }
 function rebuildClips() {
   const w = contentWidth();
@@ -1139,13 +1142,22 @@ function setZoom(pps, anchorClientX) {
   const rect = scroller.getBoundingClientRect();
   const ax = anchorClientX != null ? anchorClientX - rect.left : rect.width / 2;
   const tAtAnchor = (scroller.scrollLeft + ax) / state.pps;
-  state.pps = clamp(pps, 8, 300);
+  state.pps = clamp(pps, ZOOM_MIN, ZOOM_MAX);
   els.zoomSlider.value = state.pps;
   state.dirtyTimeline = true;
   rebuildClips();
   scroller.scrollLeft = Math.max(0, tAtAnchor * state.pps - ax);
 }
+/* Fit the full timeline (clips + trailing pad) into the visible scroll area
+   with no horizontal overflow, then scroll to the start. */
+function zoomToFit() {
+  const w = els.timelineScroll.clientWidth || 800;
+  const span = Math.max(projDur() + TIMELINE_PAD_SEC, 1);
+  setZoom(w / span);
+  els.timelineScroll.scrollLeft = 0;
+}
 els.zoomSlider.addEventListener("input", () => setZoom(+els.zoomSlider.value));
+$("btnZoomFit").addEventListener("click", zoomToFit);
 els.timelineScroll.addEventListener("wheel", (e) => {
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault();
@@ -2724,6 +2736,7 @@ window.addEventListener("keydown", (e) => {
   }
   else if (k === "+" || k === "=") setZoom(state.pps * 1.25);
   else if (k === "-") setZoom(state.pps / 1.25);
+  else if (k === "Z" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); zoomToFit(); }
   else if ((e.ctrlKey || e.metaKey) && (k === "z" || k === "Z")) {
     e.preventDefault();
     e.shiftKey ? redo() : undo();
