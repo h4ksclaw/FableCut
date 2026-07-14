@@ -196,7 +196,9 @@
 <script>
 /* ══ MCP URL Param Handler ══
    ?project=2c9d1f6c90ec → fetches recipe from MCP bucket, converts, loads
-   Works on page load before app.js initializes the editor. */
+   Works two ways:
+   1. Server mode (localhost:7777): calls /api/mcp-import (downloads media locally)
+   2. Static mode (GitHub Pages): uses mcp-client.js to convert client-side */
 (async function() {
   const params = new URLSearchParams(location.search);
   const mcpId = params.get('project') || params.get('mcp');
@@ -208,22 +210,64 @@
   overlay.style.display = 'flex';
 
   try {
-    status.textContent = 'Fetching recipe: ' + mcpId;
-    bar.style.width = '20%';
+    const hasServer = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
-    const resp = await fetch('/api/mcp-import?id=' + encodeURIComponent(mcpId));
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: resp.statusText }));
-      throw new Error(err.error || 'Import failed');
+    if (hasServer) {
+      /* ── Server mode: use /api/mcp-import ── */
+      status.textContent = 'Fetching recipe: ' + mcpId;
+      bar.style.width = '20%';
+      const resp = await fetch('/api/mcp-import?id=' + encodeURIComponent(mcpId));
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(err.error || 'Import failed');
+      }
+      const result = await resp.json();
+      bar.style.width = '100%';
+      status.textContent = `Loaded: ${result.clips} clips, ${result.media} media (${result.tool})`;
+    } else {
+      /* Static mode: client-side conversion via mcp-client.js ── */
+      if (typeof McpClient === 'undefined') {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'mcp-client.js';
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('Failed to load mcp-client.js'));
+          document.head.appendChild(s);
+        });
+      }
+
+      status.textContent = 'Fetching recipe: ' + mcpId;
+      bar.style.width = '30%';
+
+      const result = await McpClient.importRecipe(mcpId);
+      const project = result.project;
+
+      bar.style.width = '70%';
+      status.textContent = `Converting: ${project.clips.length} clips, ${project.media.length} media`;
+
+      // Set global so app.js picks it up during connectServer()
+      window.__MCP_PROJECT__ = project;
+
+      // Wait for app.js to initialize, then trigger reload
+      bar.style.width = '90%';
+      await new Promise(r => {
+        if (window.__fablecutReady) r();
+        else window.addEventListener('fablecut-ready', r, { once: true });
+        // Fallback timeout
+        setTimeout(r, 3000);
+      });
+
+      // If app.js exposed applyProject, call it directly
+      if (typeof window.applyProject === 'function') {
+        window.applyProject(project);
+      }
+
+      bar.style.width = '100%';
+      status.textContent = `Loaded: ${project.clips.length} clips, ${project.media.length} media`;
     }
-    const result = await resp.json();
-    bar.style.width = '80%';
-    status.textContent = `Loaded: ${result.clips} clips, ${result.media} media (${result.tool})`;
 
-    // Wait for app.js to pick up the new project via SSE
-    bar.style.width = '100%';
+    // Wait for app.js to pick up the new project via SSE/event
     await new Promise(r => setTimeout(r, 800));
-
     status.textContent = 'Ready!';
     overlay.style.opacity = '0';
     overlay.style.transition = 'opacity .3s';
@@ -231,7 +275,7 @@
   } catch (e) {
     status.textContent = 'Error: ' + e.message;
     bar.style.background = '#ef4444';
-    setTimeout(() => { overlay.style.display = 'none'; }, 3000);
+    setTimeout(() => { overlay.style.display = 'none'; }, 5000);
   }
 })();
 </script>

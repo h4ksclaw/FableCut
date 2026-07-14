@@ -281,6 +281,11 @@ async function connectServer() {
   } catch {
     state.connected = false;
     els.projectName.textContent = project.name + "  ·  ⚪ local session";
+    /* Static hosting: check for MCP project injected by the URL param handler */
+    if (window.__MCP_PROJECT__) {
+      applyProject(window.__MCP_PROJECT__);
+      await probeMissingMeta();
+    }
   }
   await probeMissingMeta();
 }
@@ -3072,3 +3077,8 @@ rebuildClips();
 renderBin();
 connectServer().then(loadLibraryFonts);
 requestAnimationFrame(loop);
+
+/* Expose for MCP static-mode integration */
+window.applyProject = applyProject;
+window.__fablecutReady = true;
+window.dispatchEvent(new Event('fablecut-ready'));
