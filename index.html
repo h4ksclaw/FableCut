@@ -184,6 +184,58 @@
 
 <div id="toast"></div>
 
+<!-- MCP import overlay (shown when loading a recipe) -->
+<div id="mcpOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;">
+  <div style="font-size:24px;font-weight:700;color:#7b6cff;">Importing MCP Recipe...</div>
+  <div id="mcpStatus" style="font-size:14px;color:#aaa;">Fetching recipe JSON</div>
+  <div id="mcpProgress" style="width:300px;height:4px;background:#333;border-radius:2px;overflow:hidden;">
+    <div id="mcpBar" style="width:0%;height:100%;background:#7b6cff;transition:width .3s;"></div>
+  </div>
+</div>
+
+<script>
+/* ══ MCP URL Param Handler ══
+   ?project=2c9d1f6c90ec → fetches recipe from MCP bucket, converts, loads
+   Works on page load before app.js initializes the editor. */
+(async function() {
+  const params = new URLSearchParams(location.search);
+  const mcpId = params.get('project') || params.get('mcp');
+  if (!mcpId) return;
+
+  const overlay = document.getElementById('mcpOverlay');
+  const status = document.getElementById('mcpStatus');
+  const bar = document.getElementById('mcpBar');
+  overlay.style.display = 'flex';
+
+  try {
+    status.textContent = 'Fetching recipe: ' + mcpId;
+    bar.style.width = '20%';
+
+    const resp = await fetch('/api/mcp-import?id=' + encodeURIComponent(mcpId));
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || 'Import failed');
+    }
+    const result = await resp.json();
+    bar.style.width = '80%';
+    status.textContent = `Loaded: ${result.clips} clips, ${result.media} media (${result.tool})`;
+
+    // Wait for app.js to pick up the new project via SSE
+    bar.style.width = '100%';
+    await new Promise(r => setTimeout(r, 800));
+
+    status.textContent = 'Ready!';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity .3s';
+    setTimeout(() => overlay.style.display = 'none', 300);
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+    bar.style.background = '#ef4444';
+    setTimeout(() => { overlay.style.display = 'none'; }, 3000);
+  }
+})();
+</script>
+
 <script src="app.js"></script>
 </body>
 </html>

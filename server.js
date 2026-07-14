@@ -19,6 +19,7 @@ const os = require("os");
 const { spawn, spawnSync, execFile } = require("child_process");
 
 const { analyze } = require("./analyze");
+const { importMcpProject } = require("./mcp-converter");
 
 const ROOT = __dirname;
 const MEDIA_DIR = path.join(ROOT, "media");
@@ -213,6 +214,44 @@ const server = http.createServer(async (req, res) => {
   const p = decodeURIComponent(url.pathname);
   // never serve dotfiles/dot-directories (.git, .gitignore, …)
   if (p.split(/[\\/]/).some((seg) => seg.startsWith("."))) { res.writeHead(403); res.end(); return; }
+
+  /* API: MCP import — ?id=2c9d1f6c90ec fetches recipe, converts, sets project */
+  if (p === "/api/mcp-import" && req.method === "GET") {
+    const mcpId = url.searchParams.get("id");
+    if (!mcpId) { sendJSON(res, 400, { error: "missing ?id=<recipe_id>" }); return; }
+    try {
+      const { project, recipe } = await importMcpProject(mcpId, MEDIA_DIR);
+      // Write as the active project (force overwrite)
+      project.revision = (JSON.parse(fs.readFileSync(PROJECT_FILE, "utf8").replace(/^\uFEFF/, "")).revision || 0) + 1;
+      fs.writeFileSync(PROJECT_FILE, JSON.stringify(project, null, 2));
+      onFsChange();
+      sendJSON(res, 200, { ok: true, projectId: mcpId, clips: project.clips.length, media: project.media.length, tool: recipe.tool });
+    } catch (e) { sendJSON(res, 500, { error: String(e.message || e) }); }
+    return;
+  }
+
+  /* API: CORS proxy — fetch remote media URLs to avoid CORS issues in browser */
+  if (p === "/api/proxy" && req.method === "GET") {
+    const targetUrl = url.searchParams.get("url");
+    if (!targetUrl) { sendJSON(res, 400, { error: "missing ?url=" }); return; }
+    const lib = targetUrl.startsWith("https") ? require("https") : http;
+    lib.get(targetUrl, { timeout: 30000 }, (proxyRes) => {
+      if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
+        // Redirect: tell client to follow
+        sendJSON(res, 200, { redirect: proxyRes.headers.location });
+        return;
+      }
+      const headers = { "Content-Type": proxyRes.headers["content-type"] || "application/octet-stream" };
+      if (proxyRes.headers["content-length"]) headers["Content-Length"] = proxyRes.headers["content-length"];
+      if (proxyRes.headers["accept-ranges"]) headers["Accept-Ranges"] = proxyRes.headers["accept-ranges"];
+      if (proxyRes.headers["content-range"]) headers["Content-Range"] = proxyRes.headers["content-range"];
+      res.writeHead(proxyRes.statusCode || 200, headers);
+      proxyRes.pipe(res);
+    }).on("error", (e) => {
+      sendJSON(res, 502, { error: "proxy error: " + String(e.message) });
+    });
+    return;
+  }
 
   /* API: project */
   if (p === "/api/project" && req.method === "GET") {
