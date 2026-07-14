@@ -281,13 +281,21 @@ async function connectServer() {
   } catch {
     state.connected = false;
     els.projectName.textContent = project.name + "  ·  ⚪ local session";
-    /* Static hosting: check for MCP project injected by the URL param handler */
+  }
+  await probeMissingMeta();
+  /* Static hosting: check for MCP project (may arrive slightly after boot) */
+  if (!state.connected && !window.__MCP_PROJECT_CHECKED__) {
+    window.__MCP_PROJECT_CHECKED__ = true;
+    let waited = 0;
+    while (!window.__MCP_PROJECT__ && waited < 5000) {
+      await new Promise(r => setTimeout(r, 100)); waited += 100;
+    }
     if (window.__MCP_PROJECT__) {
       applyProject(window.__MCP_PROJECT__);
       await probeMissingMeta();
+      rebuildClips(); renderBin();
     }
   }
-  await probeMissingMeta();
 }
 function applyProject(data) {
   Object.assign(project, {
