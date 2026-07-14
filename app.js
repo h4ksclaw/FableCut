@@ -294,6 +294,7 @@ async function connectServer() {
       applyProject(window.__MCP_PROJECT__);
       await probeMissingMeta();
       rebuildClips(); renderBin();
+      els.projectName.textContent = project.name + "  ·  📦 MCP import";
     }
   }
 }
